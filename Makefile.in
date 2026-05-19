@@ -1,0 +1,211 @@
+#-----------------------------------------------------------------------
+# Makefile.in -- tcllunasvg
+# Wird durch ./configure zu Makefile generiert
+#-----------------------------------------------------------------------
+
+# -----------------------------------------------------------------------
+# Plattform-Erkennung: Shared-Library-Suffix
+# (eigen-detektiert, weil TEA's @SHLIB_SUFFIX@ nicht ueberall substituiert
+#  wird — z.B. BAWT-Tcl unter Windows)
+# -----------------------------------------------------------------------
+ifeq ($(OS),Windows_NT)
+    SHLIB_EXT  := .dll
+    IS_WINDOWS := 1
+else
+    KERNEL := $(shell uname -s 2>/dev/null)
+    ifeq ($(findstring MINGW,$(KERNEL)),MINGW)
+        SHLIB_EXT  := .dll
+        IS_WINDOWS := 1
+    else ifeq ($(findstring CYGWIN,$(KERNEL)),CYGWIN)
+        SHLIB_EXT  := .dll
+        IS_WINDOWS := 1
+    else ifeq ($(findstring MSYS,$(KERNEL)),MSYS)
+        SHLIB_EXT  := .dll
+        IS_WINDOWS := 1
+    else ifeq ($(findstring UCRT,$(KERNEL)),UCRT)
+        SHLIB_EXT  := .dll
+        IS_WINDOWS := 1
+    else ifeq ($(KERNEL),Darwin)
+        SHLIB_EXT  := .dylib
+        IS_WINDOWS := 0
+    else
+        SHLIB_EXT  := .so
+        IS_WINDOWS := 0
+    endif
+endif
+
+PKG_SOURCES  = @PKG_SOURCES@
+PKG_OBJECTS  = tcllunasvg.@OBJEXT@
+
+VPATH = @srcdir@/src:@srcdir@
+PKG_TCL_SOURCES = @PKG_TCL_SOURCES@
+PKG_HEADERS  = @PKG_HEADERS@
+PKG_LIB_FILE = @PKG_LIB_FILE@
+PKG_DIR      = $(PACKAGE_NAME)$(PACKAGE_VERSION)
+
+PACKAGE_NAME    = @PACKAGE_NAME@
+PACKAGE_VERSION = @PACKAGE_VERSION@
+
+CC          = @CC@
+CXX         = @CXX@
+CLEANFILES  = @CLEANFILES@
+EXEEXT      = @EXEEXT@
+OBJEXT      = @OBJEXT@
+RANLIB      = @RANLIB@
+RANLIB_STUB = @RANLIB_STUB@
+SHLIB_LD    = @SHLIB_LD@
+SHLIB_LD_LIBS = @SHLIB_LD_LIBS@
+TCL_BIN_DIR = @TCL_BIN_DIR@
+TCL_SRC_DIR = @TCL_SRC_DIR@
+TCL_VERSION = @TCL_VERSION@
+TCLSH       ?= @TCLSH_PROG@
+INSTALL         = install
+INSTALL_DATA    = install -m 644
+INSTALL_PROGRAM = install -m 755
+
+prefix      = @prefix@
+exec_prefix = @exec_prefix@
+libdir      = $(prefix)/lib/tcltk
+includedir  = @includedir@
+datarootdir = @datarootdir@
+datadir     = @datadir@
+
+PACKAGE_DIR = $(DESTDIR)$(libdir)/$(PKG_DIR)
+
+PKG_CFLAGS  = @PKG_CFLAGS@
+
+INCLUDES    = @PKG_INCLUDES@ @TCL_INCLUDES@
+DEFINES     = @DEFS@ -DUSE_TCL_STUBS \
+              -DPACKAGE_NAME=\"$(PACKAGE_NAME)\" \
+              -DPACKAGE_VERSION=\"$(PACKAGE_VERSION)\"
+
+CXXFLAGS    = -O2 -std=c++17 -fPIC \
+              $(INCLUDES) $(DEFINES) $(PKG_CFLAGS)
+
+# -static-libstdc++ -static-libgcc: avoid runtime DLL dependencies
+# on Windows (MinGW). On Linux these are harmless.
+LDFLAGS     = @PKG_LIBS@ @TCL_STUB_LIB_SPEC@ -static-libstdc++ -static-libgcc
+
+# Output-Dateiname mit Plattform-Suffix
+TCLLUNASVG_SO = libtcllunasvg$(SHLIB_EXT)
+
+# Pfade zu Laufzeit-Bibliotheken (lunasvg + plutovg) fuer test/demo
+LUNASVG_BIN    = @LUNASVG_DIR@/build_shared
+LUNASVG_BIN_PV = @LUNASVG_DIR@/build_shared/plutovg
+
+# Quell-DLLs fuer das install-Target (Windows)
+LUNASVG_DLL    = @LUNASVG_DIR@/build_shared/liblunasvg.dll
+PLUTOVG_DLL_1  = @LUNASVG_DIR@/build_shared/libplutovg.dll
+PLUTOVG_DLL_2  = @LUNASVG_DIR@/build_shared/plutovg/libplutovg.dll
+
+# UCRT64 Runtime-DLLs (nur Windows). Pfad ueber MSYS2_BIN override-bar.
+MSYS2_BIN ?= /ucrt64/bin
+RUNTIME_STDCPP    = $(MSYS2_BIN)/libstdc++-6.dll
+RUNTIME_GCC_SEH   = $(MSYS2_BIN)/libgcc_s_seh-1.dll
+RUNTIME_PTHREAD   = $(MSYS2_BIN)/libwinpthread-1.dll
+
+# ================================================================
+# Ziele
+# ================================================================
+
+.PHONY: all clean distclean install test binaries libraries demo
+
+all: binaries libraries
+
+binaries: $(TCLLUNASVG_SO)
+
+libraries:
+
+%.$(OBJEXT): @srcdir@/src/%.cpp
+	$(CXX) -c $(CXXFLAGS) $< -o $@
+
+%.$(OBJEXT): %.cpp
+	$(CXX) -c $(CXXFLAGS) $< -o $@
+
+$(TCLLUNASVG_SO): $(PKG_OBJECTS)
+	$(CXX) -shared -o $@ $(PKG_OBJECTS) $(LDFLAGS)
+
+# ================================================================
+# Install
+#
+# Linux/macOS: nur libtcllunasvg.{so,dylib} und pkgIndex.tcl
+# Windows:     plus liblunasvg.dll, libplutovg.dll, libstdc++-6.dll,
+#              libgcc_s_seh-1.dll, libwinpthread-1.dll — damit das
+#              Paket out-of-the-box ladbar ist, ohne dass irgendeine
+#              andere DLL-Quelle (z.B. tclmcairo-Verzeichnis) im PATH
+#              steht und falsche Versionen liefert.
+# ================================================================
+
+install: all
+	@mkdir -p $(PACKAGE_DIR)
+	@mkdir -p $(PACKAGE_DIR)/tcllunasvg
+	$(INSTALL_PROGRAM) $(TCLLUNASVG_SO) $(PACKAGE_DIR)/
+	$(INSTALL_DATA) pkgIndex.tcl $(PACKAGE_DIR)/
+	@if [ -f @srcdir@/tcl/compat-$(PACKAGE_VERSION).tm ]; then \
+	    $(INSTALL_DATA) @srcdir@/tcl/compat-$(PACKAGE_VERSION).tm \
+	        $(PACKAGE_DIR)/tcllunasvg/; \
+	fi
+ifeq ($(IS_WINDOWS),1)
+	@echo ""
+	@echo "Windows: kopiere lunasvg + Runtime-DLLs nach $(PACKAGE_DIR)/"
+	@if [ -f "$(LUNASVG_DLL)" ]; then \
+	    cp "$(LUNASVG_DLL)" "$(PACKAGE_DIR)/" && echo "   OK: liblunasvg.dll"; \
+	else \
+	    echo "   WARN: $(LUNASVG_DLL) nicht gefunden — manuell kopieren!"; \
+	fi
+	@if [ -f "$(PLUTOVG_DLL_1)" ]; then \
+	    cp "$(PLUTOVG_DLL_1)" "$(PACKAGE_DIR)/" && echo "   OK: libplutovg.dll"; \
+	elif [ -f "$(PLUTOVG_DLL_2)" ]; then \
+	    cp "$(PLUTOVG_DLL_2)" "$(PACKAGE_DIR)/" && echo "   OK: libplutovg.dll (aus plutovg/)"; \
+	else \
+	    echo "   INFO: libplutovg.dll nicht separat (evtl. statisch in liblunasvg eingebettet)"; \
+	fi
+	@for d in $(RUNTIME_STDCPP) $(RUNTIME_GCC_SEH) $(RUNTIME_PTHREAD); do \
+	    if [ -f "$$d" ]; then \
+	        cp "$$d" "$(PACKAGE_DIR)/" && echo "   OK: $$(basename $$d)"; \
+	    else \
+	        echo "   INFO: $$d nicht gefunden (mglw. statisch eingebettet)"; \
+	    fi; \
+	done
+endif
+	@echo ""
+	@echo "tcllunasvg $(PACKAGE_VERSION) installed to:"
+	@echo "    $(PACKAGE_DIR)"
+
+# ================================================================
+# Test — setzt PATH/LD_LIBRARY_PATH fuer lunasvg-DLLs
+# ================================================================
+
+test: all
+	@echo "Running tests with $(TCLSH)..."
+	@PATH="$(LUNASVG_BIN):$(LUNASVG_BIN_PV):$(PATH)" \
+	 LD_LIBRARY_PATH="$(LUNASVG_BIN):$(LUNASVG_BIN_PV):$(LD_LIBRARY_PATH)" \
+	 TCLLUNASVG_LIBDIR=. \
+	 $(TCLSH) @srcdir@/tests/all.tcl
+
+demo: all
+	@PATH="$(LUNASVG_BIN):$(LUNASVG_BIN_PV):$(PATH)" \
+	 LD_LIBRARY_PATH="$(LUNASVG_BIN):$(LUNASVG_BIN_PV):$(LD_LIBRARY_PATH)" \
+	 TCLLUNASVG_LIBDIR=. \
+	 $(TCLSH) @srcdir@/demos/demo-svg-png.tcl
+
+# ================================================================
+# Release-ZIP
+# ================================================================
+
+zip: distclean
+	cd .. && zip -r tcllunasvg_$(PACKAGE_VERSION).zip tcllunasvg/ \
+	    --exclude "*.git*" --exclude "*.bak" --exclude "*.o"
+	@echo "Created: ../tcllunasvg_$(PACKAGE_VERSION).zip"
+
+# ================================================================
+# Clean
+# ================================================================
+
+clean:
+	-rm -f $(TCLLUNASVG_SO) $(PKG_LIB_FILE) $(PKG_OBJECTS) $(CLEANFILES)
+	-rm -f libtcllunasvg.so libtcllunasvg.dll libtcllunasvg.dylib
+	-rm -f *.lib *.pdb *.exp
+
+distclean: clean
+	-rm -f Makefile pkgIndex.tcl config.cache config.log config.status

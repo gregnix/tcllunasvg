@@ -1,0 +1,198 @@
+# tests/test-tcllunasvg.test -- core functionality
+package require tcltest 2.5
+namespace import ::tcltest::*
+
+if {[info exists ::env(TCLLUNASVG_LIBDIR)]} {
+    set ::auto_path [linsert $::auto_path 0 $::env(TCLLUNASVG_LIBDIR)]
+}
+
+package require tcllunasvg
+
+# Setup: write a minimal test SVG to a temp file
+set test_svg_data {<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100" height="50" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="100" height="50" fill="#ff0000"/>
+  <text x="50" y="30" text-anchor="middle" fill="white" font-size="16">test</text>
+</svg>}
+
+set tmpdir [file join [file dirname [info script]] tmp]
+file mkdir $tmpdir
+set test_svg_file [file join $tmpdir test.svg]
+set test_png_out  [file join $tmpdir test_out.png]
+set fp [open $test_svg_file w]
+puts -nonewline $fp $test_svg_data
+close $fp
+
+# ----------------------------------------------------------------------
+test version-1.0 {version returns non-empty string} -body {
+    set v [tcllunasvg::version]
+    expr {[string length $v] > 0}
+} -result 1
+
+test version-1.1 {version_number returns integer} -body {
+    set n [tcllunasvg::version_number]
+    expr {$n >= 30500}
+} -result 1
+
+# ----------------------------------------------------------------------
+test load-1.0 {load from file returns a handle command} -body {
+    set doc [tcllunasvg::load file $test_svg_file]
+    set ok [expr {[info commands $doc] eq $doc}]
+    $doc destroy
+    set ok
+} -result 1
+
+test load-1.1 {load from data returns a handle} -body {
+    set doc [tcllunasvg::load data $test_svg_data]
+    set ok [expr {[info commands $doc] eq $doc}]
+    $doc destroy
+    set ok
+} -result 1
+
+test load-1.2 {load with bad mode errors} -body {
+    catch {tcllunasvg::load badmode foo} err
+    string match {bad source*} $err
+} -result 1
+
+test load-1.3 {load from nonexistent file errors} -body {
+    catch {tcllunasvg::load file /no/such/file.svg} err
+    string match {*could not load*} $err
+} -result 1
+
+# ----------------------------------------------------------------------
+test size-1.0 {width returns float} -setup {
+    set doc [tcllunasvg::load data $test_svg_data]
+} -body {
+    set w [$doc width]
+    expr {$w == 100.0}
+} -cleanup {
+    $doc destroy
+} -result 1
+
+test size-1.1 {height returns float} -setup {
+    set doc [tcllunasvg::load data $test_svg_data]
+} -body {
+    set h [$doc height]
+    expr {$h == 50.0}
+} -cleanup {
+    $doc destroy
+} -result 1
+
+test size-1.2 {size returns {w h}} -setup {
+    set doc [tcllunasvg::load data $test_svg_data]
+} -body {
+    $doc size
+} -cleanup {
+    $doc destroy
+} -result {100.0 50.0}
+
+# ----------------------------------------------------------------------
+test to_png-1.0 {to_png writes a file} -setup {
+    set doc [tcllunasvg::load data $test_svg_data]
+    file delete -force $test_png_out
+} -body {
+    $doc to_png $test_png_out
+    file exists $test_png_out
+} -cleanup {
+    $doc destroy
+    file delete -force $test_png_out
+} -result 1
+
+test to_png-1.1 {to_png with -scale} -setup {
+    set doc [tcllunasvg::load data $test_svg_data]
+    file delete -force $test_png_out
+} -body {
+    $doc to_png $test_png_out -scale 2
+    set size [file size $test_png_out]
+    expr {$size > 0}
+} -cleanup {
+    $doc destroy
+    file delete -force $test_png_out
+} -result 1
+
+test to_png-1.2 {to_png with bg color} -setup {
+    set doc [tcllunasvg::load data $test_svg_data]
+    file delete -force $test_png_out
+} -body {
+    $doc to_png $test_png_out -bg white
+    file exists $test_png_out
+} -cleanup {
+    $doc destroy
+    file delete -force $test_png_out
+} -result 1
+
+test to_png-1.3 {to_png with bad bg color errors} -setup {
+    set doc [tcllunasvg::load data $test_svg_data]
+} -body {
+    catch {$doc to_png $test_png_out -bg notAColor} err
+    string match {bad color value*} $err
+} -cleanup {
+    $doc destroy
+} -result 1
+
+# ----------------------------------------------------------------------
+test to_argb32-1.0 {to_argb32 returns dict with required keys} -setup {
+    set doc [tcllunasvg::load data $test_svg_data]
+} -body {
+    set img [$doc to_argb32]
+    set keys [lsort [dict keys $img]]
+    set keys
+} -cleanup {
+    $doc destroy
+} -result {data height stride width}
+
+test to_argb32-1.1 {to_argb32 data has expected length} -setup {
+    set doc [tcllunasvg::load data $test_svg_data]
+} -body {
+    set img [$doc to_argb32]
+    set w [dict get $img width]
+    set h [dict get $img height]
+    set stride [dict get $img stride]
+    set data [dict get $img data]
+    set expected [expr {$stride * $h}]
+    set actual   [string length $data]
+    expr {$actual == $expected}
+} -cleanup {
+    $doc destroy
+} -result 1
+
+test to_argb32-1.2 {to_argb32 with -scale doubles dimensions} -setup {
+    set doc [tcllunasvg::load data $test_svg_data]
+} -body {
+    set img [$doc to_argb32 -scale 2]
+    list [dict get $img width] [dict get $img height]
+} -cleanup {
+    $doc destroy
+} -result {200 100}
+
+# ----------------------------------------------------------------------
+test stylesheet-1.0 {apply_stylesheet does not error} -setup {
+    set doc [tcllunasvg::load data $test_svg_data]
+} -body {
+    $doc apply_stylesheet {rect { fill: blue; }}
+    set ok 1
+} -cleanup {
+    $doc destroy
+} -result 1
+
+# ----------------------------------------------------------------------
+test destroy-1.0 {destroy removes handle command} -body {
+    set doc [tcllunasvg::load data $test_svg_data]
+    $doc destroy
+    info commands $doc
+} -result {}
+
+# ----------------------------------------------------------------------
+test file_to_png-1.0 {file_to_png one-shot} -body {
+    file delete -force $test_png_out
+    tcllunasvg::file_to_png $test_svg_file $test_png_out -scale 2
+    file exists $test_png_out
+} -cleanup {
+    file delete -force $test_png_out
+} -result 1
+
+# ----------------------------------------------------------------------
+# Cleanup
+file delete -force $tmpdir
+
+cleanupTests

@@ -1,0 +1,42 @@
+# pkgIndex.tcl.in -- tcllunasvg
+# Wird durch ./configure zu pkgIndex.tcl substituiert.
+#
+# Auf Windows enthaelt das Paket-Verzeichnis die Abhaengigkeits-DLLs
+# (liblunasvg.dll, libplutovg.dll, libstdc++-6.dll, libgcc_s_seh-1.dll,
+# libwinpthread-1.dll). Diese werden temporaer auf den PATH gehaengt,
+# damit der Windows-Loader sie findet, wenn libtcllunasvg.dll geladen
+# wird -- unabhaengig vom aktuellen Arbeitsverzeichnis.
+
+if {![package vsatisfies [package provide Tcl] 8.6-]} { return }
+
+package ifneeded @PACKAGE_NAME@ @PACKAGE_VERSION@ [list apply {{dir} {
+    if {$::tcl_platform(platform) eq "windows"} {
+        # DLL-Verzeichnis temporaer in den PATH einfuegen, damit Windows
+        # die Abhaengigkeiten beim Laden von libtcllunasvg.dll findet.
+        set _oldpath $::env(PATH)
+        set ::env(PATH) "$dir;$_oldpath"
+
+        # Explizites Vor-Laden der Abhaengigkeiten mit absoluten Pfaden:
+        # robuster als nur PATH-Aenderung, falls Windows die DLL aus dem
+        # System32 oder einer anderen Lokation zuerst auswaehlen wuerde.
+        foreach dep {
+            libwinpthread-1.dll
+            libgcc_s_seh-1.dll
+            libstdc++-6.dll
+            libplutovg.dll
+            liblunasvg.dll
+        } {
+            set p [file join $dir $dep]
+            if {[file exists $p]} { catch {load $p} }
+        }
+    }
+
+    set lib [file join $dir libtcllunasvg[info sharedlibextension]]
+    load $lib Tcllunasvg
+
+    if {$::tcl_platform(platform) eq "windows"} {
+        # PATH zuruecksetzen -- die DLL ist geladen, weitere Abhaengigkeiten
+        # nicht mehr noetig.
+        set ::env(PATH) $_oldpath
+    }
+}} $dir]
