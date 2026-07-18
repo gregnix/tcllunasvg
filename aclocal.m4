@@ -1,4 +1,5 @@
 builtin(include,tclconfig/tcl.m4)
+builtin(include,tclconfig/tea-cxx.m4)
 
 dnl AX_CHECK_COMPILE_FLAG -- Hilfsmakro für Compiler-Flag-Tests
 AC_DEFUN([AX_CHECK_COMPILE_FLAG], [

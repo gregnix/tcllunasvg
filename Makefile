@@ -34,59 +34,59 @@ else
     endif
 endif
 
-PKG_SOURCES  = @PKG_SOURCES@
-PKG_OBJECTS  = tcllunasvg.@OBJEXT@
+PKG_SOURCES  =  src/tcllunasvg.cpp
+PKG_OBJECTS  = tcllunasvg.o
 
-VPATH = @srcdir@/src:@srcdir@
-PKG_TCL_SOURCES = @PKG_TCL_SOURCES@
-PKG_HEADERS  = @PKG_HEADERS@
-PKG_LIB_FILE = @PKG_LIB_FILE@
+VPATH = ./src
+PKG_TCL_SOURCES = 
+PKG_HEADERS  = 
+PKG_LIB_FILE = libtcllunasvg0.1.1.so
 PKG_DIR      = $(PACKAGE_NAME)$(PACKAGE_VERSION)
 
-PACKAGE_NAME    = @PACKAGE_NAME@
-PACKAGE_VERSION = @PACKAGE_VERSION@
+PACKAGE_NAME    = tcllunasvg
+PACKAGE_VERSION = 0.1.1
 
-CC          = @CC@
-CXX         = @CXX@
-CLEANFILES  = @CLEANFILES@
-EXEEXT      = @EXEEXT@
-OBJEXT      = @OBJEXT@
-RANLIB      = @RANLIB@
-RANLIB_STUB = @RANLIB_STUB@
-SHLIB_LD    = @SHLIB_LD@
-SHLIB_LD_LIBS = @SHLIB_LD_LIBS@
-TCL_BIN_DIR = @TCL_BIN_DIR@
-TCL_SRC_DIR = @TCL_SRC_DIR@
-TCL_VERSION = @TCL_VERSION@
-TCLSH       ?= @TCLSH_PROG@
+CC          = gcc
+CXX         = g++
+CLEANFILES  = 
+EXEEXT      = 
+OBJEXT      = o
+RANLIB      = :
+RANLIB_STUB = ranlib
+SHLIB_LD    = ${CXX} ${CXXFLAGS} ${LDFLAGS_DEFAULT} -shared -static-libstdc++ -static-libgcc
+SHLIB_LD_LIBS = ${LIBS} -L/usr/lib/x86_64-linux-gnu -ltclstub8.6
+TCL_BIN_DIR = /usr/lib/tcl8.6
+TCL_SRC_DIR = /usr/include/tcl8.6/tcl-private
+TCL_VERSION = 8.6
+TCLSH       ?= /usr/bin/tclsh8.6
 INSTALL         = install
 INSTALL_DATA    = install -m 644
 INSTALL_PROGRAM = install -m 755
 
-prefix      = @prefix@
-exec_prefix = @exec_prefix@
+prefix      = /usr
+exec_prefix = /usr
 libdir      = $(prefix)/lib/tcltk
-includedir  = @includedir@
-datarootdir = @datarootdir@
-datadir     = @datadir@
+includedir  = ${prefix}/include
+datarootdir = ${prefix}/share
+datadir     = ${datarootdir}
 
 PACKAGE_DIR = $(DESTDIR)$(libdir)/$(PKG_DIR)
 
-PKG_CFLAGS  = @PKG_CFLAGS@
+PKG_CFLAGS  = 
 
-INCLUDES    = @PKG_INCLUDES@ @TCL_INCLUDES@
-DEFINES     = @DEFS@ -DUSE_TCL_STUBS \
+INCLUDES    =  -I/home/greg/src/lunasvg/include -I"/usr/include/tcl8.6"
+DEFINES     = -DPACKAGE_NAME=\"tcllunasvg\" -DPACKAGE_TARNAME=\"tcllunasvg\" -DPACKAGE_VERSION=\"0.1.1\" -DPACKAGE_STRING=\"tcllunasvg\ 0.1.1\" -DPACKAGE_BUGREPORT=\"\" -DPACKAGE_URL=\"\" -DBUILD_tcllunasvg=/\*\*/ -DHAVE_STDIO_H=1 -DHAVE_STDLIB_H=1 -DHAVE_STRING_H=1 -DHAVE_INTTYPES_H=1 -DHAVE_STDINT_H=1 -DHAVE_STRINGS_H=1 -DHAVE_SYS_STAT_H=1 -DHAVE_SYS_TYPES_H=1 -DHAVE_UNISTD_H=1 -DSTDC_HEADERS=1 -DTcl_Size=int -DUSE_THREAD_ALLOC=1 -D_REENTRANT=1 -D_THREAD_SAFE=1 -DTCL_THREADS=1 -DUSE_TCL_STUBS=1 -DUSE_TCLOO_STUBS=1 -DMODULE_SCOPE=extern\ __attribute__\(\(__visibility__\(\"hidden\"\)\)\) -DHAVE_HIDDEN=1 -DHAVE_CAST_TO_UNION=1 -DHAVE_STDBOOL_H=1 -DTCL_WIDE_INT_IS_LONG=1 -DTCL_CFG_OPTIMIZED=1 -DUSE_TCL_STUBS=1 -DTCL_MAJOR_VERSION=8 -DTK_MAJOR_VERSION=8 -DUSE_TCL_STUBS \
               -DPACKAGE_NAME=\"$(PACKAGE_NAME)\" \
               -DPACKAGE_VERSION=\"$(PACKAGE_VERSION)\"
 
 # C++ flags computed by tea-cxx (TEA_SETUP_CXX): -std=c++NN plus TEA's
 # CFLAGS_DEFAULT / CFLAGS_WARNING / SHLIB_CFLAGS (-O2 -Wall -fPIC). The component
-# variables must be defined here, because @CXXFLAGS@ references them by name.
-CXXFLAGS_STD   = @CXXFLAGS_STD@
-CFLAGS_DEFAULT = @CFLAGS_DEFAULT@
-CFLAGS_WARNING = @CFLAGS_WARNING@
-SHLIB_CFLAGS   = @SHLIB_CFLAGS@
-CXXFLAGS    = @CXXFLAGS@ \
+# variables must be defined here, because  ${CXXFLAGS_STD} ${CFLAGS_DEFAULT} ${CFLAGS_WARNING} ${SHLIB_CFLAGS} references them by name.
+CXXFLAGS_STD   = -std=c++17
+CFLAGS_DEFAULT = -O2 -fomit-frame-pointer -DNDEBUG
+CFLAGS_WARNING = -Wall
+SHLIB_CFLAGS   = -fPIC
+CXXFLAGS    =  ${CXXFLAGS_STD} ${CFLAGS_DEFAULT} ${CFLAGS_WARNING} ${SHLIB_CFLAGS} \
               $(INCLUDES) $(DEFINES) $(PKG_CFLAGS)
 
 # The C++ driver and the static-runtime flags come from SHLIB_LD (tea-cxx:
@@ -95,27 +95,27 @@ CXXFLAGS    = @CXXFLAGS@ \
 #   PKG_LIBS       -- lunasvg (from TEA_ADD_LIBS)
 #   SHLIB_LD_LIBS  -- Tcl stub lib, base libs, Windows link flags
 # LDFLAGS is left empty for user-supplied -L/-l on the command line.
-PKG_LIBS    = @PKG_LIBS@
+PKG_LIBS    =  -L/home/greg/src/lunasvg/build_shared -llunasvg
 LDFLAGS     =
 
 # Output-Dateiname mit Plattform-Suffix
 # Generation-aware library name from TEA (TEA_MAKE_LIB):
-#   Tcl 8.6 -> libtcllunasvg0.1.1.so       (@PKG_LIB_FILE8@)
-#   Tcl 9.0 -> libtcl9tcllunasvg0.1.1.so   (@PKG_LIB_FILE9@)
+#   Tcl 8.6 -> libtcllunasvg0.1.1.so       (libtcllunasvg0.1.1.so)
+#   Tcl 9.0 -> libtcl9tcllunasvg0.1.1.so   (libtcl9tcllunasvg0.1.1.so)
 # One ./configure + make per Tcl produces its own name, so both can live side by
 # side in the same package directory; pkgIndex.tcl loads the matching one.
-PKG_LIB_FILE8 = @PKG_LIB_FILE8@
-PKG_LIB_FILE9 = @PKG_LIB_FILE9@
-TCLLUNASVG_SO = @PKG_LIB_FILE@
+PKG_LIB_FILE8 = libtcllunasvg0.1.1.so
+PKG_LIB_FILE9 = libtcl9tcllunasvg0.1.1.so
+TCLLUNASVG_SO = libtcllunasvg0.1.1.so
 
 # Pfade zu Laufzeit-Bibliotheken (lunasvg + plutovg) fuer test/demo
-LUNASVG_BIN    = @LUNASVG_DIR@/build_shared
-LUNASVG_BIN_PV = @LUNASVG_DIR@/build_shared/plutovg
+LUNASVG_BIN    = /home/greg/src/lunasvg/build_shared
+LUNASVG_BIN_PV = /home/greg/src/lunasvg/build_shared/plutovg
 
 # Quell-DLLs fuer das install-Target (Windows)
-LUNASVG_DLL    = @LUNASVG_DIR@/build_shared/liblunasvg.dll
-PLUTOVG_DLL_1  = @LUNASVG_DIR@/build_shared/libplutovg.dll
-PLUTOVG_DLL_2  = @LUNASVG_DIR@/build_shared/plutovg/libplutovg.dll
+LUNASVG_DLL    = /home/greg/src/lunasvg/build_shared/liblunasvg.dll
+PLUTOVG_DLL_1  = /home/greg/src/lunasvg/build_shared/libplutovg.dll
+PLUTOVG_DLL_2  = /home/greg/src/lunasvg/build_shared/plutovg/libplutovg.dll
 
 # UCRT64 Runtime-DLLs (nur Windows). Pfad ueber MSYS2_BIN override-bar.
 MSYS2_BIN ?= /ucrt64/bin
@@ -127,7 +127,7 @@ RUNTIME_PTHREAD   = $(MSYS2_BIN)/libwinpthread-1.dll
 # Ziele
 # ================================================================
 
-.PHONY: all clean distclean install test binaries libraries demo copy-deps
+.PHONY: all clean distclean install test binaries libraries demo
 
 all: binaries libraries
 
@@ -137,9 +137,9 @@ libraries:
 
 # Portable suffix rule (works with BSD make too). VPATH (above) makes the
 # src/ sources reachable by base name.
-.SUFFIXES: .cpp .@OBJEXT@
+.SUFFIXES: .cpp .o
 
-.cpp.@OBJEXT@:
+.cpp.o:
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 
 $(TCLLUNASVG_SO): $(PKG_OBJECTS)
@@ -161,8 +161,8 @@ install: all
 	@mkdir -p $(PACKAGE_DIR)/tcllunasvg
 	$(INSTALL_PROGRAM) $(TCLLUNASVG_SO) $(PACKAGE_DIR)/
 	$(INSTALL_DATA) pkgIndex.tcl $(PACKAGE_DIR)/
-	@if [ -f @srcdir@/tcl/compat-$(PACKAGE_VERSION).tm ]; then \
-	    $(INSTALL_DATA) @srcdir@/tcl/compat-$(PACKAGE_VERSION).tm \
+	@if [ -f ./tcl/compat-$(PACKAGE_VERSION).tm ]; then \
+	    $(INSTALL_DATA) ./tcl/compat-$(PACKAGE_VERSION).tm \
 	        $(PACKAGE_DIR)/tcllunasvg/; \
 	fi
 ifeq ($(IS_WINDOWS),1)
@@ -193,39 +193,21 @@ endif
 	@echo "    $(PACKAGE_DIR)"
 
 # ================================================================
-# Test / Demo
-#
-# The loaded extension resolves its dependency DLLs (liblunasvg, libplutovg) at
-# load time. Two mechanisms cover both platforms:
-#   - Unix:    LD_LIBRARY_PATH points at the lunasvg build dir.
-#   - Windows: copy the dependency DLLs next to the freshly built extension, so
-#     the loader (and pkgIndex's dependency pre-load) find them in the same
-#     directory. PATH is unreliable here: a Windows path (C:/...) collides with
-#     the ':' list separator when make hands it to a native tclsh.
+# Test — setzt PATH/LD_LIBRARY_PATH fuer lunasvg-DLLs
 # ================================================================
 
-# Windows only: place the lunasvg dependency DLLs (and any non-static runtime
-# DLLs) next to the built extension, mirroring what install does.
-copy-deps:
-ifeq ($(IS_WINDOWS),1)
-	@for f in "$(LUNASVG_DLL)" "$(PLUTOVG_DLL_1)" "$(PLUTOVG_DLL_2)" \
-	          "$(RUNTIME_STDCPP)" "$(RUNTIME_GCC_SEH)" "$(RUNTIME_PTHREAD)"; do \
-	    if [ -f "$$f" ]; then cp -f "$$f" . ; fi; \
-	done
-endif
-
-test: all copy-deps
+test: all
 	@echo "Running tests with $(TCLSH)..."
 	@PATH="$(LUNASVG_BIN):$(LUNASVG_BIN_PV):$(PATH)" \
 	 LD_LIBRARY_PATH="$(LUNASVG_BIN):$(LUNASVG_BIN_PV):$(LD_LIBRARY_PATH)" \
 	 TCLLUNASVG_LIBDIR=. \
-	 $(TCLSH) @srcdir@/tests/all.tcl
+	 $(TCLSH) ./tests/all.tcl
 
-demo: all copy-deps
+demo: all
 	@PATH="$(LUNASVG_BIN):$(LUNASVG_BIN_PV):$(PATH)" \
 	 LD_LIBRARY_PATH="$(LUNASVG_BIN):$(LUNASVG_BIN_PV):$(LD_LIBRARY_PATH)" \
 	 TCLLUNASVG_LIBDIR=. \
-	 $(TCLSH) @srcdir@/demos/demo-svg-png.tcl
+	 $(TCLSH) ./demos/demo-svg-png.tcl
 
 # ================================================================
 # Release-ZIP
@@ -242,7 +224,6 @@ zip: distclean
 
 clean:
 	-rm -f $(TCLLUNASVG_SO) $(PKG_LIB_FILE8) $(PKG_LIB_FILE9) $(PKG_OBJECTS) $(CLEANFILES)
-	-rm -f liblunasvg.dll libplutovg.dll libstdc++-6.dll libgcc_s_seh-1.dll libwinpthread-1.dll
 	-rm -f *.lib *.pdb *.exp
 
 distclean: clean

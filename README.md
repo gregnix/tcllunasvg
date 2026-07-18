@@ -1,44 +1,44 @@
-# tcllunasvg — SVG-Rendering für Tcl
+# tcllunasvg — SVG rendering for Tcl
 
-Tcl-Binding für [lunasvg](https://github.com/sammycage/lunasvg) — rendert SVG
-zu PNG-Dateien oder ARGB32-Pixelpuffern. **Kein Tk, kein Cairo erforderlich**:
-läuft im reinen `tclsh`.
+Tcl binding for [lunasvg](https://github.com/sammycage/lunasvg) — renders SVG to
+PNG files or ARGB32 pixel buffers. **No Tk, no Cairo required**: runs in plain
+`tclsh`.
 
-**Version:** 0.1.0 · **License:** BSD-2-Clause · **Tcl:** 8.6 / 9.0
-**Output:** PNG-Datei, ARGB32-Byte-Buffer
-**Plattformen:** Linux, Windows (MSYS2 UCRT64), macOS (ungetestet)
-
----
-
-## Was ist tcllunasvg?
-
-Eine **eigenständige, schlanke Tcl-Erweiterung** für SVG-Rendering.
-Hervorgegangen aus der ehemaligen lunasvg-Integration in `tclmcairo` —
-jetzt sauber getrennt, ohne C-Level-Kopplung an Cairo oder Tk.
-
-Wenn ein Workflow das gerenderte SVG **mit Cairo** weiterverarbeiten will,
-liefert `to_argb32` einen Byte-Puffer, den `tclmcairo` über sein
-`image_from_argb32`-API (ab tclmcairo 0.4.0) aufnehmen kann. Tk-basierte
-Anwendungen können den PNG-Output direkt mit `image create photo` laden.
+**Version:** 0.1.1 · **License:** BSD-2-Clause · **Tcl:** 8.6 / 9.0
+**Output:** PNG file, ARGB32 byte buffer
+**Platforms:** Linux, Windows (MSYS2 UCRT64), macOS (untested)
 
 ---
 
-## Schnellstart
+## What is tcllunasvg?
 
-### PNG aus SVG erzeugen (One-Shot)
+A **standalone, lightweight Tcl extension** for SVG rendering. Extracted from the
+former lunasvg integration in `tclmcairo` — now cleanly separated, with no
+C-level coupling to Cairo or Tk.
+
+When a workflow wants to post-process the rendered SVG **with Cairo**, `to_argb32`
+returns a byte buffer that `tclmcairo` can take in via its `image_from_argb32`
+API (from tclmcairo 0.4.0). Tk-based applications can load the PNG output
+directly with `image create photo`.
+
+---
+
+## Quick start
+
+### Produce a PNG from an SVG (one-shot)
 
 ```tcl
 package require tcllunasvg
 tcllunasvg::file_to_png "logo.svg" "logo.png" -scale 2
 ```
 
-### Document-Handle für mehrfache Renderings
+### Document handle for multiple renderings
 
 ```tcl
 package require tcllunasvg
 
-set doc [tcllunasvg::load file "diagramm.svg"]
-puts "SVG-Größe: [$doc size]"
+set doc [tcllunasvg::load file "diagram.svg"]
+puts "SVG size: [$doc size]"
 
 $doc to_png "small.png"   -width  200
 $doc to_png "large.png"   -scale  3.0
@@ -47,7 +47,7 @@ $doc to_png "labeled.png" -scale  2.0 -bg white
 $doc destroy
 ```
 
-### SVG aus Tcl-String rendern
+### Render an SVG from a Tcl string
 
 ```tcl
 set svg {
@@ -63,18 +63,18 @@ $doc to_png "hello.png"
 $doc destroy
 ```
 
-### ARGB32-Pixel an tclmcairo weitergeben
+### Pass ARGB32 pixels to tclmcairo
 
 ```tcl
 package require tcllunasvg
 package require tclmcairo
 
-# 1. SVG rendern
+# 1. render the SVG
 set doc [tcllunasvg::load file "icon.svg"]
 set img [$doc to_argb32 -scale 4]
 $doc destroy
 
-# 2. Pixel in tclmcairo-Kontext laden, platzieren, freigeben
+# 2. load the pixels into a tclmcairo context, place them, release
 set ctx [tclmcairo::new 800 600]
 $ctx clear 1 1 1
 set img_id [$ctx image_from_argb32 \
@@ -85,17 +85,17 @@ $ctx save "page.pdf"
 $ctx destroy
 ```
 
-> **Hinweis:** `tclmcairo::image_from_argb32` kommt mit tclmcairo 0.4.0.
-> Bis dahin nutzt `demos/demo-svg-argb32-tclmcairo.tcl` automatisch einen
-> PNG-Fallback-Pfad.
+> **Note:** `tclmcairo::image_from_argb32` arrives with tclmcairo 0.4.0. Until
+> then, `demos/demo-svg-argb32-tclmcairo.tcl` automatically uses a PNG fallback
+> path.
 
 ---
 
-## Tcl-API-Referenz
+## Tcl API reference
 
 ### `tcllunasvg::load <file|data> <argument>`
 
-Lädt ein SVG-Dokument. Gibt einen **Handle-Befehl** zurück.
+Loads an SVG document. Returns a **handle command**.
 
 ```tcl
 set doc [tcllunasvg::load file "logo.svg"]
@@ -104,60 +104,58 @@ set doc [tcllunasvg::load data $svgstring]
 
 ### `$doc width` / `$doc height` / `$doc size`
 
-Liefert die Dokument-Dimensionen aus dem SVG-`viewBox`-Attribut.
+Returns the document dimensions from the SVG `viewBox` attribute.
 
 ### `$doc apply_stylesheet <css>`
 
-Wendet zusätzliches CSS auf das Dokument an.
+Applies additional CSS to the document.
 
 ### `$doc to_png <filename> ?-width W? ?-height H? ?-scale S? ?-bg COLOR?`
 
-Rendert und schreibt PNG. PNG-Encoding macht lunasvg selbst.
+Renders and writes a PNG. PNG encoding is done by lunasvg itself.
 
 ### `$doc to_argb32 ?-width W? ?-height H? ?-scale S? ?-bg COLOR?`
 
-Rendert in einen ARGB32-Premultiplied-Byte-Puffer. Gibt Dict zurück
-mit Schlüsseln `width`, `height`, `stride`, `data`.
+Renders into an ARGB32 premultiplied byte buffer. Returns a dict with the keys
+`width`, `height`, `stride`, `data`.
 
 ### `$doc destroy`
 
-Gibt das Dokument frei.
+Releases the document.
 
-### Optionen
+### Options
 
-| Option | Werte | Bedeutung |
-|--------|-------|-----------|
-| `-width W` | int >= 1 | Ziel-Breite in Pixeln |
-| `-height H` | int >= 1 | Ziel-Höhe in Pixeln |
-| `-scale S` | float > 0 | Multiplikator auf intrinsische SVG-Größe |
-| `-bg COLOR` | Farbliteral | Hintergrund |
+| Option | Values | Meaning |
+|--------|--------|---------|
+| `-width W` | int >= 1 | target width in pixels |
+| `-height H` | int >= 1 | target height in pixels |
+| `-scale S` | float > 0 | multiplier on the intrinsic SVG size |
+| `-bg COLOR` | color literal | background |
 
-**Prioritäten für die Zielgröße** (wichtig zu beachten):
+**Target-size precedence** (important):
 
-1. Wird `-scale S` angegeben, dann ist die Ausgabegröße **immer**
-   `S * SVG-intrinsische_größe`. `-width` und `-height` werden in
-   diesem Fall **ignoriert** (kein Fehler, nur ignoriert).
-2. Sonst, wenn `-width` und/oder `-height` angegeben: diese
-   bestimmen die Zielgröße (fehlende Dimension wird proportional
-   skaliert).
-3. Sonst: 1:1 zur intrinsischen SVG-Größe.
+1. If `-scale S` is given, the output size is **always** `S * intrinsic SVG
+   size`. `-width` and `-height` are then **ignored** (no error, just ignored).
+2. Otherwise, if `-width` and/or `-height` are given: they set the target size
+   (a missing dimension is scaled proportionally).
+3. Otherwise: 1:1 with the intrinsic SVG size.
 
-**Farbliterale:** `0xAARRGGBB`, `#RRGGBB`, `#AARRGGBB`, `#RGB`, oder
+**Color literals:** `0xAARRGGBB`, `#RRGGBB`, `#AARRGGBB`, `#RGB`, or
 `white` / `black` / `transparent`.
 
 ---
 
-### Utility-Befehle
+### Utility commands
 
 #### `tcllunasvg::version`
-Liefert die lunasvg-Version (z. B. `"3.5.0"`).
+Returns the lunasvg version (e.g. `"3.5.0"`).
 
 #### `tcllunasvg::version_number`
-Liefert die Version als Integer (z. B. `30500`).
+Returns the version as an integer (e.g. `30500`).
 
 #### `tcllunasvg::font_add <family> <bold> <italic> <filename>`
 
-Registriert eine TTF/OTF-Datei im lunasvg-Font-Cache.
+Registers a TTF/OTF file in the lunasvg font cache.
 
 ```tcl
 tcllunasvg::font_add "DejaVu Sans" 0 0 "/usr/share/fonts/dejavu/DejaVuSans.ttf"
@@ -165,68 +163,84 @@ tcllunasvg::font_add "DejaVu Sans" 0 0 "/usr/share/fonts/dejavu/DejaVuSans.ttf"
 
 #### `tcllunasvg::file_to_png <in.svg> <out.png> ?opts?`
 
-Bequemer One-Shot ohne Handle.
+Convenient one-shot without a handle.
 
 ---
 
-## Was tcllunasvg **nicht** macht
+## What tcllunasvg does **not** do
 
-- **Kein `<textPath>`** — lunasvg-Upstream-Limitation. Workaround:
-  `svg2cairo` aus tclmcairo.
-- **Kein In-Place-SVG-DOM-Editing** — laden, rendern, fertig.
-- **Kein Tk-Photo-Image-Output** — bewusst. PNG schreiben und mit
-  `image create photo -file out.png` laden.
+- **No `<textPath>`** — an upstream lunasvg limitation. Workaround: `svg2cairo`
+  from tclmcairo.
+- **No in-place SVG DOM editing** — load, render, done.
+- **No Tk photo image output** — by design. Write a PNG and load it with
+  `image create photo -file out.png`.
 
 ---
 
-## Verwandte Pakete
+## Related packages
 
-- **[lunasvg](https://github.com/sammycage/lunasvg)** — zugrundeliegende
-  C++-Library (3.5+).
-- **[tclmcairo](https://github.com/gregnix/tclmcairo)** — Cairo-Binding für Tcl.
-  Konsumiert ARGB32-Output via `image_from_argb32` (ab 0.4.0).
-- **svg2cairo** (Teil von tclmcairo) — Tcl-basierter SVG-Renderer auf Cairo,
-  deckt textPath ab.
+- **[lunasvg](https://github.com/sammycage/lunasvg)** — the underlying C++
+  library (3.5+).
+- **[tclmcairo](https://github.com/gregnix/tclmcairo)** — Cairo binding for Tcl.
+  Consumes ARGB32 output via `image_from_argb32` (from 0.4.0).
+- **svg2cairo** (part of tclmcairo) — a Tcl-based SVG renderer on Cairo, covers
+  textPath.
 
-### Welchen Renderer wählen?
+### Which renderer to choose?
 
-Im tclmcairo-Ökosystem stehen drei SVG-Renderer-Pfade zur Verfügung:
+The tclmcairo ecosystem offers three SVG renderer paths:
 
-| Renderer | Aus Paket | CSS | `<text>` | `<textPath>` | `<marker>` / `<use>` | Extra-Deps |
-|----------|-----------|-----|----------|--------------|----------------------|------------|
-| `tclmcairo::svg_file` / `svg_data` | tclmcairo (nanosvg) | ✗ | ✗ | ✗ | partial | keine |
+| Renderer | From package | CSS | `<text>` | `<textPath>` | `<marker>` / `<use>` | Extra deps |
+|----------|--------------|-----|----------|--------------|----------------------|------------|
+| `tclmcairo::svg_file` / `svg_data` | tclmcairo (nanosvg) | ✗ | ✗ | ✗ | partial | none |
 | `svg2cairo::render` | tclmcairo | ✓ | ✓ | ✓ fallback | ✗ | tDOM |
-| `tcllunasvg` (dieses Paket) → `image_from_argb32` | tcllunasvg + tclmcairo | ✓ | ✓ | ✗ upstream | ✓ | lunasvg DLL |
+| `tcllunasvg` (this package) → `image_from_argb32` | tcllunasvg + tclmcairo | ✓ | ✓ | ✗ upstream | ✓ | lunasvg DLL |
 
-**tcllunasvg lohnt sich,** wenn das SVG `<marker>`, `<use>`, `<clipPath>`,
-Gradienten in `<defs>`, oder eingebettete `<image>`-Elemente enthält, die
-nanosvg und svg2cairo nicht durchrendern. Für reines `<textPath>` ist
-svg2cairo nach wie vor der einzige Weg.
+**tcllunasvg is worth it** when the SVG contains `<marker>`, `<use>`,
+`<clipPath>`, gradients in `<defs>`, or embedded `<image>` elements that nanosvg
+and svg2cairo do not render. For plain `<textPath>`, svg2cairo remains the only
+way.
 
 ---
 
-## Build / Installation
+## Build / installation
 
-Siehe `INSTALL.md`. Kurz:
+See `INSTALL.md`. In short (`configure` is included — `autoconf` is only needed
+if you change `configure.ac`):
 
 **Linux:**
 ```bash
-autoconf
 ./configure --with-tcl=/usr/lib/tcl8.6 --with-lunasvg=$HOME/src/lunasvg
 make && sudo make install && make test
 ```
 
 **Windows MSYS2 UCRT64:**
 ```bash
-autoconf
 ./configure --with-tcl=/c/Tcl/lib --with-lunasvg=$HOME/src/lunasvg
 make && make install && make test
 ```
 
-`make install` unter Windows kopiert alle benötigten DLLs ins Paket-Verzeichnis.
+On Windows, `make install` copies all required DLLs into the package directory.
+
+> **Match the C runtime.** Build the extension with the **same** runtime as the
+> target Tcl: MSYS2 **UCRT64** for MSVC-built Tcl (official binaries, Magicsplat),
+> but the **BAWT MinGW** toolchain for a BAWT Tcl (which is `msvcrt`-based).
+> Check with `objdump -p tcl90.dll | findstr /i "DLL Name"`. See `INSTALL.md`.
+
+### Both Tcl generations at once
+
+Each build produces a generation-specific library name
+(`libtcllunasvg0.1.1.so` for 8.6, `libtcl9tcllunasvg0.1.1.so` for 9.0), so you
+can install both into the same directory and `pkgIndex.tcl` loads the right one:
+
+```bash
+./configure --with-tcl=/usr/lib/tcl8.6 --with-lunasvg=… && make && sudo make install
+make clean
+./configure --with-tcl=/usr/lib/tcl9.0 --with-lunasvg=… && make && sudo make install
+```
 
 ---
 
-## Lizenz
+## License
 
-BSD 2-Clause (siehe `LICENSE`). Lunasvg selbst ist MIT-lizenziert.
+BSD 2-Clause (see `LICENSE`). lunasvg itself is MIT-licensed.

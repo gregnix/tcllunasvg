@@ -9,7 +9,7 @@
 
 if {![package vsatisfies [package provide Tcl] 8.6-]} { return }
 
-package ifneeded @PACKAGE_NAME@ @PACKAGE_VERSION@ [list apply {{dir} {
+package ifneeded tcllunasvg 0.1.1 [list apply {{dir} {
     if {$::tcl_platform(platform) eq "windows"} {
         # DLL-Verzeichnis temporaer in den PATH einfuegen, damit Windows
         # die Abhaengigkeiten beim Laden von libtcllunasvg.dll findet.
@@ -33,11 +33,11 @@ package ifneeded @PACKAGE_NAME@ @PACKAGE_VERSION@ [list apply {{dir} {
 
     # Load the binary built for this Tcl generation. The 8.6 and 9.0 stub ABIs
     # are incompatible, so each generation gets its own file; both can be
-    # installed in this directory at once (@PKG_LIB_FILE8@ / @PKG_LIB_FILE9@).
+    # installed in this directory at once (libtcllunasvg0.1.1.so / libtcl9tcllunasvg0.1.1.so).
     if {[package vsatisfies [package provide Tcl] 9-]} {
-        set lib [file join $dir @PKG_LIB_FILE9@]
+        set lib [file join $dir libtcl9tcllunasvg0.1.1.so]
     } else {
-        set lib [file join $dir @PKG_LIB_FILE8@]
+        set lib [file join $dir libtcllunasvg0.1.1.so]
     }
     load $lib Tcllunasvg
 

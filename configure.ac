@@ -18,7 +18,7 @@
 # Crashes beim Aufraeumen — siehe INSTALL.md "Tcl-Auswahl".
 #-----------------------------------------------------------------------
 
-AC_INIT([tcllunasvg], [0.1.0])
+AC_INIT([tcllunasvg], [0.1.1])
 
 TEA_INIT([3.9])
 
@@ -107,9 +107,46 @@ AC_SUBST(TCLSH_PROG)
 TEA_PREFIX
 TEA_SETUP_COMPILER
 
-# C++17 Compiler — lunasvg ist C++17
-AC_PROG_CXX
+# Sources -- declared before the C flags are computed; no compiler needed here.
+TEA_ADD_SOURCES([src/tcllunasvg.cpp])
+TEA_ADD_HEADERS([])
+TEA_ADD_TCL_SOURCES([])
+
+TEA_PUBLIC_TCL_HEADERS
+# TEA_PRIVATE_TCL_HEADERS -- removed: we use Tcl stubs (USE_TCL_STUBS), so no
+# private headers (tclInt.h etc.) are needed; it would also fail when
+# tclConfig.sh points at a non-existent build dir (relocated BAWT Tcls).
+
+TEA_ENABLE_THREADS
+TEA_ENABLE_SHARED
+TEA_CONFIG_CFLAGS
+TEA_ENABLE_SYMBOLS
+
+#--------------------------------------------------------------------
+# C++ support (tea-cxx).
+#
+# tcl.m4 sets up only a C compiler. TEA_SETUP_CXX adds the C++ compiler and
+# rewrites SHLIB_LD to link with it; TEA_CXX_RUNTIME links the C++ runtime
+# statically (-static-libstdc++), so the extension carries no libstdc++
+# dependency on the target -- important for single-file / zipkit builds.
+#
+# Both MUST come AFTER TEA_CONFIG_CFLAGS, because they rewrite the SHLIB_LD
+# that macro computed. lunasvg is C++17 (the default of --with-cxx-standard).
+#--------------------------------------------------------------------
+
+TEA_SETUP_CXX
+TEA_CXX_RUNTIME
+
+#--------------------------------------------------------------------
+# lunasvg detection runs in C++ mode, using the compiler TEA_SETUP_CXX set up.
+# The probes need an *expandable* CXXFLAGS; the TEA-built CXXFLAGS holds make
+# variable references (${CXXFLAGS_STD} …) that only resolve at build time, so
+# use a clean value (just the -std flag) for the tests and restore it after.
+#--------------------------------------------------------------------
+
 AC_LANG_PUSH([C++])
+tea_luna_save_CXXFLAGS="$CXXFLAGS"
+CXXFLAGS="$CXXFLAGS_STD"
 
 #--------------------------------------------------------------------
 # lunasvg-Suche
@@ -224,28 +261,17 @@ AC_CHECK_HEADER([lunasvg.h], [], [
 ])
 CXXFLAGS="$ac_save_CXXFLAGS"
 
+
+CXXFLAGS="$tea_luna_save_CXXFLAGS"
 AC_LANG_POP([C++])
 
 # Erkannte Flags an Makefile durchreichen
 TEA_ADD_INCLUDES([$LUNASVG_CFLAGS])
 TEA_ADD_LIBS([$LUNASVG_LIBS])
-TEA_ADD_SOURCES([src/tcllunasvg.cpp])
-TEA_ADD_HEADERS([])
-TEA_ADD_TCL_SOURCES([])
-
-TEA_PUBLIC_TCL_HEADERS
-# TEA_PRIVATE_TCL_HEADERS — entfernt: wir nutzen Stubs (USE_TCL_STUBS),
-# also keine private headers (tclInt.h etc.) noetig. TEA_PRIVATE_TCL_HEADERS
-# wuerde zudem fehlschlagen, wenn tclConfig.sh auf ein nicht-existentes
-# Build-Verzeichnis zeigt (z.B. bei BAWT-distribuierten Tcls, wo der
-# urspruengliche Build-Pfad woanders lag).
-
-TEA_ENABLE_THREADS
-TEA_ENABLE_SHARED
-TEA_CONFIG_CFLAGS
-TEA_ENABLE_SYMBOLS
 
 AC_DEFINE(USE_TCL_STUBS, 1, [Use Tcl stubs])
+
+TEA_MAKE_LIB
 
 TEA_PROG_TCLSH
 
