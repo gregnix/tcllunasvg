@@ -159,15 +159,33 @@ In MSYS2 UCRT64 Bash:
 cd ~/src
 git clone https://github.com/sammycage/lunasvg.git
 cd lunasvg
-cmake -B build_shared -DBUILD_SHARED_LIBS=ON .
+cmake -B build_shared -DBUILD_SHARED_LIBS=ON \
+      -DCMAKE_SHARED_LINKER_FLAGS="-static-libstdc++ -static-libgcc -Wl,--out-implib,liblunasvg.dll.a" .
 cmake --build build_shared -j
 ```
+
+**Both linker flags matter on Windows.**
+
+`-static-libstdc++ -static-libgcc` makes lunasvg carry its own C++ runtime.
+Without them it needs `libstdc++-6.dll`, `libgcc_s_seh-1.dll` and
+`libwinpthread-1.dll` at load time — and Windows resolves those against the
+directory of the **executable** first. A BAWT Tcl ships its own copies next to
+`tclsh90.exe`, `tclsh90.exe` loads them at startup, and from then on no
+pre-loading can replace them: the base name is already taken. A lunasvg built
+with a newer toolchain then runs against the older runtime and dies with an
+access violation (`0xC0000005`, reported by tcltest as
+*child killed: unknown signal*). With the flags the question never arises.
+
+`-Wl,--out-implib,liblunasvg.dll.a` produces the import library that the linker
+needs; without it the build fails with `cannot find -llunasvg` even though the
+DLL is right there.
 
 > **Note:** the CMake generator switch `-G "MinGW Makefiles"` is **not** needed
 > here — it does not even exist under UCRT64.
 
 Result:
 - `~/src/lunasvg/build_shared/liblunasvg.dll`
+- `~/src/lunasvg/build_shared/liblunasvg.dll.a`
 - `~/src/lunasvg/build_shared/plutovg/libplutovg.dll`
 
 ### Step 3 — build and install tcllunasvg
@@ -205,6 +223,12 @@ Copies into `$(prefix)/lib/tcltk/tcllunasvg<version>/`:
 This makes the package **self-contained**. Windows finds all required DLLs in the
 same directory.
 
+Items 5 to 7 come from the directory of the compiler in use (`MSYS2_BIN`, derived
+from `g++`, so MINGW64 and UCRT64 each get their own). If lunasvg was built with
+a static C++ runtime as recommended above, nothing depends on them any more and
+they are copied only as a courtesy — building in one MSYS2 world and copying the
+runtime of the other is what mixes the two C runtimes in the first place.
+
 ### Tcl 9.0
 
 ```bash
@@ -230,11 +254,12 @@ pacman -S autoconf automake make pkgconf \
           mingw-w64-x86_64-cmake \
           mingw-w64-x86_64-ninja
 
-# lunasvg
+# lunasvg -- static C++ runtime plus import library, see the section above
 cd ~/src
 git clone https://github.com/sammycage/lunasvg.git
 cd lunasvg
-cmake -B build_shared -DBUILD_SHARED_LIBS=ON .
+cmake -B build_shared -DBUILD_SHARED_LIBS=ON \
+      -DCMAKE_SHARED_LINKER_FLAGS="-static-libstdc++ -static-libgcc -Wl,--out-implib,liblunasvg.dll.a" .
 cmake --build build_shared -j
 
 # tcllunasvg, against the BAWT Tcl
@@ -330,6 +355,60 @@ chapter "Eigene Pakete integrieren".
 
 ---
 
+
+## Windows with Visual Studio (nmake)
+
+`win/makefile.vc` builds with MSVC. Verified with Visual Studio 2022
+(cl 19.44, AMD64) against Tcl 8.6 and a static lunasvg; the MinGW path above
+remains the one exercised on every change.
+
+lunasvg has to be built with MSVC as well, because C++ objects from different
+compilers do not mix:
+
+```cmd
+cmake -G "Visual Studio 17 2022" -A x64 -DBUILD_SHARED_LIBS=OFF ^
+      -B C:\src\lunasvg\build_msvc C:\src\lunasvg
+cmake --build C:\src\lunasvg\build_msvc --config Release
+```
+
+This produces two archives, and they do **not** share a directory:
+
+```
+build_msvc\Release\lunasvg.lib
+build_msvc\plutovg\Release\plutovg.lib      <- plutovg is a subproject
+```
+
+`makefile.vc` looks in both places. Skipping the CMake step shows up as
+
+```
+LINK : fatal error LNK1181: cannot open input file '...\lunasvg.lib'
+```
+
+`makefile.vc` defines `LUNASVG_BUILD_STATIC`, which a static lunasvg requires:
+without it `lunasvg.h` declares its API `__declspec(dllimport)` and the link
+fails on `__imp_` symbols. CMake sets that macro for consumers that build with
+CMake; an nmake build has to state it.
+
+Then:
+
+```cmd
+cd win
+nmake -f makefile.vc clean
+nmake -f makefile.vc INSTALLDIR=C:\Tcl LUNASVGDIR=C:\src\lunasvg
+nmake -f makefile.vc INSTALLDIR=C:\Tcl LUNASVGDIR=C:\src\lunasvg install
+```
+
+The `clean` is worth keeping in the habit: nmake compares an object against its
+source only, so after a change to `makefile.vc` it relinks an object compiled
+under the old settings. The result is a link failing on `__imp_` symbols while
+the makefile looks right. `makefile.vc` ties the objects to itself to prevent
+that, but a stale tree from before that change still needs one clean.
+
+On MSVC there is no C++ driver to swap and no `-lstdc++` to add: `cl` compiles
+C++ by file extension and `link` reads the runtime directive from the object
+file. What TEA's stock `rules.vc` lacks is the inference rule for `.cpp`, which
+is why `win/rules.vc` here is the patched copy from the `tea-cxx` project.
+
 ## Verification after installation
 
 ```tcl
@@ -405,6 +484,41 @@ from `/ucrt64/bin/` into the tcllunasvg install directory by hand.
 Tcl mismatch between the build Tcl and the runtime Tcl. See the section
 "Choosing the Tcl" above. Fix: build tcllunasvg against exactly the Tcl that will
 load it.
+
+
+### Crash on load with a BAWT Tcl (`0xC0000005`, `child killed: unknown signal`)
+
+The extension links its own C++ runtime statically, but **lunasvg does not** --
+it needs `libstdc++-6.dll`, `libgcc_s_seh-1.dll` and `libwinpthread-1.dll`.
+Windows resolves those against the directory of the **executable** first, and a
+BAWT Tcl ships its own copies next to `tclsh90.exe`:
+
+```
+C:\Tcl9.0.4\bin\libgcc_s_seh-1.dll     150196   (BAWT, gcc 14.2)
+C:\msys64\mingw64\bin\libgcc_s_seh-1.dll  151364   (MSYS2, gcc 15.2)
+```
+
+`tclsh90.exe` loads BAWT's copies at startup, so the pre-load in `pkgIndex.tcl`
+can no longer win -- a DLL with that base name is already in the process. The
+newer lunasvg then runs against the older runtime and dies with an access
+violation.
+
+The fix is to remove the dependency: build lunasvg with a static C++ runtime.
+
+```bash
+cd ~/src/lunasvg
+rm -rf build_shared
+cmake -B build_shared -DBUILD_SHARED_LIBS=ON \
+      -DCMAKE_SHARED_LINKER_FLAGS="-static-libstdc++ -static-libgcc -Wl,--out-implib,liblunasvg.dll.a" .
+cmake --build build_shared -j
+```
+
+Then rebuild and reinstall tcllunasvg. Afterwards no MinGW runtime DLL needs to
+travel with the package at all.
+
+Note also that `make install` takes those runtime DLLs from the directory of the
+compiler in use (`MSYS2_BIN`, derived from `g++`). Building in MINGW64 and
+copying UCRT64 DLLs -- or the other way round -- mixes the two C runtimes.
 
 ### `package require tcllunasvg` → `can't find package tcllunasvg`
 

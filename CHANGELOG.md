@@ -17,6 +17,56 @@ Build-only update, **no change to the Tcl API**.
   (`@CXXFLAGS@`) instead of a hardcoded `-O2 -std=c++17 -fPIC`.
 - Portable `.cpp.@OBJEXT@` suffix rule instead of the GNU `%` pattern rule.
 
+### Windows
+
+- `make install` takes the MinGW runtime DLLs from the directory of the compiler
+  in use (`MSYS2_BIN`, derived from `g++`) instead of a hard-coded `/ucrt64/bin`.
+  Building in MINGW64 while copying UCRT64 DLLs mixed the two C runtimes.
+- INSTALL.md now builds lunasvg with `-static-libstdc++ -static-libgcc` as the
+  recommended way, and explains why: a BAWT Tcl ships its own MinGW runtime next
+  to `tclsh90.exe` and loads it at startup, so the pre-load in `pkgIndex.tcl`
+  cannot replace it -- a lunasvg built with a newer toolchain then crashes with
+  `0xC0000005`, which tcltest reports as *child killed: unknown signal*. Verified
+  against BAWT Tcl 9.0.4: 19/19 after the change.
+- Added `win/makefile.vc` for Visual Studio, with the patched `rules.vc` from the
+  tea-cxx project (stock TEA has no inference rule for `.cpp`). Builds with
+  Visual Studio 2022 against Tcl 8.6 and a static lunasvg. Four things it has to
+  get right, each of which failed first:
+  - `GENERICDIR` must point at `src/` before `rules-ext.vc` is included --
+    rules.vc derives its `.cpp` inference rules from it and defaults to
+    `generic/`, so nmake otherwise finds no rule for the object.
+  - `LUNASVG_BUILD_STATIC` must be defined: a static lunasvg is declared
+    `__declspec(dllimport)` without it and the link fails on `__imp_` symbols.
+    CMake sets the macro only for consumers that build with CMake.
+  - lunasvg and plutovg do not share a build directory -- CMake writes
+    `build_msvc\Release\lunasvg.lib` but `build_msvc\plutovg\Release\plutovg.lib`.
+    The makefile looks in both places.
+  - `$(PRJ_OBJS): $(MAKEFILEVC)` -- nmake compares objects against sources only,
+    so a changed `-D` would otherwise relink an object built without it.
+
+### Build robustness
+
+- **Tcl headers are taken from the `--with-tcl` prefix** whenever that prefix
+  carries its own `include/tcl.h`. TEA searches for `tcl.h` by itself, and on a
+  machine with several Tcls it can pick the wrong ones -- MSYS2 keeps Tcl 8.6
+  headers in `/mingw64/include`, so a build targeting a Tcl 9 under
+  `/c/Tcl9.0.4` ended up with Tcl 9 stubs and Tcl 8.6 declarations. The first
+  symptom was `error: 'Tcl_Size' was not declared in this scope`. The existing
+  auto-repair did this only for relocated trees; it now applies to healthy ones
+  as well.
+- **configure verifies that headers and library agree.** If they do not, it
+  stops and names both versions and both directories instead of leaving the
+  mismatch to the compiler.
+
+- Object files now depend on the generated `Makefile`. Reconfiguring for the
+  other Tcl generation changes the include paths and the stub library but not
+  the timestamps of the sources, so `make` used to relink stale objects and
+  produce a library that reports *this extension is compiled for Tcl 8.6* under
+  Tcl 9. A `make clean` in between is no longer required.
+- Removed the unused `find_handle()` helper: handles travel as `ClientData`, so
+  the name lookup was never called and only produced a compiler warning. The
+  build is warning-free again.
+
 ### Two Tcl generations side by side
 
 - `TEA_MAKE_LIB` yields generation-aware library names: `libtcllunasvg0.1.1.so`

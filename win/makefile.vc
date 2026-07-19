@@ -1,0 +1,122 @@
+#------------------------------------------------------------- -*- makefile -*-
+# makefile.vc --
+#
+#	Microsoft Visual C++ makefile for tcllunasvg.
+#
+#	nmake -f makefile.vc INSTALLDIR=C:\Tcl LUNASVGDIR=C:\src\lunasvg
+#	nmake -f makefile.vc INSTALLDIR=C:\Tcl LUNASVGDIR=C:\src\lunasvg test
+#	nmake -f makefile.vc INSTALLDIR=C:\Tcl LUNASVGDIR=C:\src\lunasvg install
+#
+#	Built successfully with Visual Studio 2022 (cl 19.44, AMD64) against
+#	Tcl 8.6 and a static lunasvg. The MinGW path (configure/make under
+#	MSYS2) remains the one exercised on every change.
+#
+#	Two things here are not ordinary TEA:
+#
+#	1. The source is .cpp rather than .c, which needs the patched rules.vc
+#	   from the tea-cxx project. On MSVC there is no C++ driver to swap and
+#	   no -lstdc++ to add -- cl compiles C++ by file extension and link.exe
+#	   reads the runtime directive cl embeds in the object file. The only
+#	   thing missing from stock TEA is the inference rule for .cpp.
+#
+#	2. lunasvg has to be built with MSVC as well; C++ objects from
+#	   different compilers do not mix:
+#
+#	       cmake -G "Visual Studio 17 2022" -A x64 ^
+#	             -DBUILD_SHARED_LIBS=OFF ^
+#	             -B C:\src\lunasvg\build_msvc C:\src\lunasvg
+#	       cmake --build C:\src\lunasvg\build_msvc --config Release
+#
+#	   That produces build_msvc\Release\lunasvg.lib and plutovg.lib. If the
+#	   linker reports LNK1181 for either of them, this step was skipped or
+#	   built somewhere else -- point LUNASVGDIR at the right tree.
+#
+#	   A static lunasvg keeps the package free of extra DLLs, which is what
+#	   the MinGW build achieves with -static-libstdc++.
+#
+# Copyright (c) 2026 Gregor
+# Distributed under the same terms as tclconfig; see tclconfig/license.terms.
+#------------------------------------------------------------------------------
+
+PROJECT = tcllunasvg
+
+# The sources live in src/, not in generic/. rules.vc derives its inference
+# rules from GENERICDIR and defaults it to $(ROOT)\generic, so it has to be set
+# before the include -- otherwise nmake finds no rule for tcllunasvg.obj and
+# stops with
+#
+#     NMAKE : fatal error U1073: ... tcllunasvg.obj konnte nicht erstellt werden
+#
+# $(ROOT) is defined inside rules.vc, hence $(MAKEDIR) (the win/ directory).
+GENERICDIR = $(MAKEDIR)\..\src
+
+!include "rules-ext.vc"
+
+PRJ_OBJS = $(TMP_DIR)\tcllunasvg.obj
+
+# Where the lunasvg tree lives. Override on the command line:
+#	nmake -f makefile.vc LUNASVGDIR=C:\src\lunasvg
+!ifndef LUNASVGDIR
+LUNASVGDIR = ..\..\lunasvg
+!endif
+
+LUNASVG_INC = $(LUNASVGDIR)\include
+LUNASVG_BLD = $(LUNASVGDIR)\build_msvc
+
+# The two archives do not end up in the same place: CMake writes lunasvg.lib to
+# build_msvc\Release, but plutovg is a subproject and lands in
+# build_msvc\plutovg\Release. Older trees put both side by side, so look for
+# each of them.
+!if exist("$(LUNASVG_BLD)\Release\lunasvg.lib")
+LUNASVG_LIB_FILE = $(LUNASVG_BLD)\Release\lunasvg.lib
+!else
+LUNASVG_LIB_FILE = $(LUNASVG_BLD)\lunasvg.lib
+!endif
+
+!if exist("$(LUNASVG_BLD)\plutovg\Release\plutovg.lib")
+PLUTOVG_LIB_FILE = $(LUNASVG_BLD)\plutovg\Release\plutovg.lib
+!elseif exist("$(LUNASVG_BLD)\Release\plutovg.lib")
+PLUTOVG_LIB_FILE = $(LUNASVG_BLD)\Release\plutovg.lib
+!else
+PLUTOVG_LIB_FILE = $(LUNASVG_BLD)\plutovg\plutovg.lib
+!endif
+
+# $(GENERICDIR) is added by rules.vc, so src/ needs no -I here.
+PRJ_INCLUDES = -I"$(LUNASVG_INC)"
+
+# LUNASVG_BUILD_STATIC is required when linking the static lunasvg: without it
+# lunasvg.h declares everything __declspec(dllimport) and the link fails on
+# __imp_ symbols. CMake sets this PUBLIC for consumers that use CMake -- nmake
+# has to state it. It is also what silences warning C4251.
+PRJ_DEFINES = \
+	-D_CRT_SECURE_NO_DEPRECATE \
+	-D_CRT_NONSTDC_NO_DEPRECATE \
+	-DLUNASVG_BUILD_STATIC \
+	-DUSE_TCL_STUBS
+
+# /std:c++17 for lunasvg, /EHsc because it uses exceptions.
+PRJ_CFLAGS = /std:c++17 /EHsc
+
+PRJ_LIBS = \
+	"$(LUNASVG_LIB_FILE)" \
+	"$(PLUTOVG_LIB_FILE)"
+
+!include "$(_RULESDIR)\targets.vc"
+
+# Rebuild the objects when this makefile changes.
+#
+# nmake compares the object against the source only, so after editing a -D here
+# -- adding LUNASVG_BUILD_STATIC, say -- it happily relinks the object compiled
+# without it. The link then fails on __imp_ symbols although the makefile looks
+# correct. $(MAKEFILEVC) is set by rules.vc and names this file.
+$(PRJ_OBJS): $(MAKEFILEVC)
+
+# default-pkgindex-tea, not default-pkgindex.
+#
+# The latter writes the index itself and emits a load command without a prefix,
+# leaving Tcl to derive the init function from the file name -- it stops at the
+# first non-letter, which mangles names containing digits. Substituting into
+# ../pkgIndex.tcl.in names the prefix explicitly, so the index is the same on
+# every platform.
+
+pkgindex: default-pkgindex-tea

@@ -117,8 +117,16 @@ LUNASVG_DLL    = @LUNASVG_DIR@/build_shared/liblunasvg.dll
 PLUTOVG_DLL_1  = @LUNASVG_DIR@/build_shared/libplutovg.dll
 PLUTOVG_DLL_2  = @LUNASVG_DIR@/build_shared/plutovg/libplutovg.dll
 
-# UCRT64 Runtime-DLLs (nur Windows). Pfad ueber MSYS2_BIN override-bar.
-MSYS2_BIN ?= /ucrt64/bin
+# MinGW runtime DLLs (Windows only).
+#
+# The directory is derived from the compiler that is actually building, not
+# hard-coded: in an MSYS2 MINGW64 shell g++ lives in /mingw64/bin (msvcrt), in
+# UCRT64 it lives in /ucrt64/bin (UCRT). Taking the DLLs from the wrong one
+# mixes the two C runtimes -- the very thing that has to be avoided when the
+# target is a msvcrt-based Tcl such as BAWT's.
+#
+# Override explicitly if needed:  make install MSYS2_BIN=/mingw64/bin
+MSYS2_BIN ?= $(shell dirname `command -v g++ 2>/dev/null` 2>/dev/null)
 RUNTIME_STDCPP    = $(MSYS2_BIN)/libstdc++-6.dll
 RUNTIME_GCC_SEH   = $(MSYS2_BIN)/libgcc_s_seh-1.dll
 RUNTIME_PTHREAD   = $(MSYS2_BIN)/libwinpthread-1.dll
@@ -141,6 +149,13 @@ libraries:
 
 .cpp.@OBJEXT@:
 	$(CXX) -c $(CXXFLAGS) $< -o $@
+
+# Reconfiguring for the other Tcl generation changes the include paths and the
+# stub library, but not the timestamps of the sources -- so make would relink
+# stale objects and produce a library that reports "this extension is compiled
+# for Tcl 8.6" under Tcl 9. Tying the objects to the generated Makefile forces a
+# rebuild after every ./configure.
+$(PKG_OBJECTS): Makefile
 
 $(TCLLUNASVG_SO): $(PKG_OBJECTS)
 	$(SHLIB_LD) -o $@ $(PKG_OBJECTS) $(PKG_LIBS) $(SHLIB_LD_LIBS) $(LDFLAGS)

@@ -127,7 +127,7 @@ RUNTIME_PTHREAD   = $(MSYS2_BIN)/libwinpthread-1.dll
 # Ziele
 # ================================================================
 
-.PHONY: all clean distclean install test binaries libraries demo
+.PHONY: all clean distclean install test binaries libraries demo copy-deps
 
 all: binaries libraries
 
@@ -141,6 +141,13 @@ libraries:
 
 .cpp.o:
 	$(CXX) -c $(CXXFLAGS) $< -o $@
+
+# Reconfiguring for the other Tcl generation changes the include paths and the
+# stub library, but not the timestamps of the sources -- so make would relink
+# stale objects and produce a library that reports "this extension is compiled
+# for Tcl 8.6" under Tcl 9. Tying the objects to the generated Makefile forces a
+# rebuild after every ./configure.
+$(PKG_OBJECTS): Makefile
 
 $(TCLLUNASVG_SO): $(PKG_OBJECTS)
 	$(SHLIB_LD) -o $@ $(PKG_OBJECTS) $(PKG_LIBS) $(SHLIB_LD_LIBS) $(LDFLAGS)
@@ -193,17 +200,35 @@ endif
 	@echo "    $(PACKAGE_DIR)"
 
 # ================================================================
-# Test — setzt PATH/LD_LIBRARY_PATH fuer lunasvg-DLLs
+# Test / Demo
+#
+# The loaded extension resolves its dependency DLLs (liblunasvg, libplutovg) at
+# load time. Two mechanisms cover both platforms:
+#   - Unix:    LD_LIBRARY_PATH points at the lunasvg build dir.
+#   - Windows: copy the dependency DLLs next to the freshly built extension, so
+#     the loader (and pkgIndex's dependency pre-load) find them in the same
+#     directory. PATH is unreliable here: a Windows path (C:/...) collides with
+#     the ':' list separator when make hands it to a native tclsh.
 # ================================================================
 
-test: all
+# Windows only: place the lunasvg dependency DLLs (and any non-static runtime
+# DLLs) next to the built extension, mirroring what install does.
+copy-deps:
+ifeq ($(IS_WINDOWS),1)
+	@for f in "$(LUNASVG_DLL)" "$(PLUTOVG_DLL_1)" "$(PLUTOVG_DLL_2)" \
+	          "$(RUNTIME_STDCPP)" "$(RUNTIME_GCC_SEH)" "$(RUNTIME_PTHREAD)"; do \
+	    if [ -f "$$f" ]; then cp -f "$$f" . ; fi; \
+	done
+endif
+
+test: all copy-deps
 	@echo "Running tests with $(TCLSH)..."
 	@PATH="$(LUNASVG_BIN):$(LUNASVG_BIN_PV):$(PATH)" \
 	 LD_LIBRARY_PATH="$(LUNASVG_BIN):$(LUNASVG_BIN_PV):$(LD_LIBRARY_PATH)" \
 	 TCLLUNASVG_LIBDIR=. \
 	 $(TCLSH) ./tests/all.tcl
 
-demo: all
+demo: all copy-deps
 	@PATH="$(LUNASVG_BIN):$(LUNASVG_BIN_PV):$(PATH)" \
 	 LD_LIBRARY_PATH="$(LUNASVG_BIN):$(LUNASVG_BIN_PV):$(LD_LIBRARY_PATH)" \
 	 TCLLUNASVG_LIBDIR=. \
@@ -224,6 +249,7 @@ zip: distclean
 
 clean:
 	-rm -f $(TCLLUNASVG_SO) $(PKG_LIB_FILE8) $(PKG_LIB_FILE9) $(PKG_OBJECTS) $(CLEANFILES)
+	-rm -f liblunasvg.dll libplutovg.dll libstdc++-6.dll libgcc_s_seh-1.dll libwinpthread-1.dll
 	-rm -f *.lib *.pdb *.exp
 
 distclean: clean

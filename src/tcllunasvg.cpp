@@ -63,11 +63,6 @@ static std::string new_handle_name() {
     return std::string(buf);
 }
 
-static DocHandle* find_handle(const std::string& name) {
-    auto it = g_handles.find(name);
-    return (it == g_handles.end()) ? nullptr : it->second;
-}
-
 /* ================================================================== */
 /* Option parsing helpers                                              */
 /* ================================================================== */

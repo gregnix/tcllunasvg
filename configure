@@ -4408,6 +4408,33 @@ printf "%s\n" "$as_me:     $with_tclinclude" >&6;}
     fi
 fi
 
+#--------------------------------------------------------------------
+# Header directory: always prefer the one belonging to --with-tcl.
+#
+# TEA_PUBLIC_TCL_HEADERS searches for tcl.h on its own. On a machine with
+# more than one Tcl -- MSYS2 carries Tcl 8.6 headers in /mingw64/include,
+# while the build may target a Tcl 9 under /c/Tcl9.0.4 -- it can pick the
+# wrong ones, and the result is a hybrid: Tcl 9 stubs, Tcl 8.6 headers.
+# That compiles until the first Tcl 9 type appears:
+#
+#     error: 'Tcl_Size' was not declared in this scope
+#
+# So whenever --with-tcl names a prefix that carries its own headers, use
+# those. The repair branch above does the same for relocated trees; this
+# applies to healthy ones as well.
+#--------------------------------------------------------------------
+
+if test -n "$with_tclconfig" -a -z "$with_tclinclude"; then
+    tea_tcl_prefix=`dirname "$with_tclconfig"`
+    if test -f "$tea_tcl_prefix/include/tcl.h"; then
+        with_tclinclude="$tea_tcl_prefix/include"
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: using Tcl headers from the --with-tcl prefix:" >&5
+printf "%s\n" "$as_me: using Tcl headers from the --with-tcl prefix:" >&6;}
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}:     $with_tclinclude" >&5
+printf "%s\n" "$as_me:     $with_tclinclude" >&6;}
+    fi
+fi
+
 # TCLSH_PROG ableiten (fuer 'make test'/'make demo')
 if test -z "$TCLSH_PROG"; then
     for candidate in \
@@ -5938,6 +5965,43 @@ printf "%s\n" "${ac_cv_c_tclh}" >&6; }
 # TEA_PRIVATE_TCL_HEADERS -- removed: we use Tcl stubs (USE_TCL_STUBS), so no
 # private headers (tclInt.h etc.) are needed; it would also fail when
 # tclConfig.sh points at a non-existent build dir (relocated BAWT Tcls).
+
+#--------------------------------------------------------------------
+# Safety net: the headers just located must belong to the same Tcl as
+# tclConfig.sh. Mixing them builds an extension that links Tcl 9 stubs
+# against Tcl 8.6 declarations, which fails in confusing places -- the
+# first Tcl 9 type reported missing is usually Tcl_Size.
+#--------------------------------------------------------------------
+
+{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking whether the Tcl headers match tclConfig.sh" >&5
+printf %s "checking whether the Tcl headers match tclConfig.sh... " >&6; }
+tea_hdr_dir=`echo "$TCL_INCLUDES" | sed -e 's|^-I||' -e 's|"||g' -e 's| .*||'`
+if test -f "$tea_hdr_dir/tcl.h"; then
+    # The define may be indented after the '#': "#   define TCL_MAJOR_VERSION 8"
+    tea_hdr_major=`sed -n 's|^#[[:space:]]*define[[:space:]][[:space:]]*TCL_MAJOR_VERSION[^0-9]*\([0-9][0-9]*\).*|\1|p' "$tea_hdr_dir/tcl.h" | head -1`
+    tea_hdr_minor=`sed -n 's|^#[[:space:]]*define[[:space:]][[:space:]]*TCL_MINOR_VERSION[^0-9]*\([0-9][0-9]*\).*|\1|p' "$tea_hdr_dir/tcl.h" | head -1`
+    tea_hdr_version="$tea_hdr_major.$tea_hdr_minor"
+    if test "$tea_hdr_version" != "$TCL_VERSION"; then
+        { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+        as_fn_error $? "Tcl headers and library do not match.
+
+tclConfig.sh reports Tcl $TCL_VERSION   ($with_tclconfig)
+the headers found are Tcl $tea_hdr_version   ($tea_hdr_dir)
+
+This happens when several Tcl versions live on the machine -- MSYS2 keeps
+Tcl 8.6 headers in /mingw64/include, for instance. Point configure at the
+matching headers:
+
+    ./configure --with-tcl=DIR/lib --with-tclinclude=DIR/include
+" "$LINENO" 5
+    fi
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes ($tea_hdr_version)" >&5
+printf "%s\n" "yes ($tea_hdr_version)" >&6; }
+else
+    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: cannot tell, no tcl.h under $tea_hdr_dir" >&5
+printf "%s\n" "cannot tell, no tcl.h under $tea_hdr_dir" >&6; }
+fi
 
 
     # Check whether --enable-threads was given.
