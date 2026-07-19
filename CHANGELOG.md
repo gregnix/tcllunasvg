@@ -46,6 +46,13 @@ Build-only update, **no change to the Tcl API**.
 
 ### Build robustness
 
+- **configure checks the lunasvg version.** The search only established that
+  *some* lunasvg is present: headers and library exist, done. A lunasvg 2.x
+  passes that and then breaks the compile with C++ errors that never mention
+  the real cause, because `Document` and `Bitmap` differ there. A preprocessor
+  test on `LUNASVG_VERSION_MAJOR`/`MINOR` now demands 3.5 or newer -- and a
+  header without those macros (2.x has none) fails it as well.
+
 - **Tcl headers are taken from the `--with-tcl` prefix** whenever that prefix
   carries its own `include/tcl.h`. TEA searches for `tcl.h` by itself, and on a
   machine with several Tcls it can pick the wrong ones -- MSYS2 keeps Tcl 8.6

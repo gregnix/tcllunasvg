@@ -317,6 +317,36 @@ CXXFLAGS="$CXXFLAGS $LUNASVG_CFLAGS"
 AC_CHECK_HEADER([lunasvg.h], [], [
     AC_MSG_ERROR([lunasvg.h not usable with current CFLAGS])
 ])
+
+# Version pruefen.
+#
+# Bis hierher ist nur belegt, dass ein lunasvg da ist -- nicht, welches. Die
+# Suche prueft, ob Header und Bibliothek existieren; ein lunasvg 2.x besteht
+# das und laesst dann den Compiler mit C++-Fehlern auflaufen, weil Document
+# und Bitmap dort anders aussehen. Die Versionsmakros beantworten das vorher.
+# Der Praeprozessor ist dafuer zuverlaessiger als sed: er benutzt genau den
+# Include-Pfad, der spaeter beim Uebersetzen gilt. Fehlt das Makro ganz (2.x
+# kennt es nicht), wertet der Praeprozessor es als 0 -- die Bedingung greift.
+AC_MSG_CHECKING([whether lunasvg is new enough (3.5+)])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <lunasvg.h>
+#if !defined(LUNASVG_VERSION_MAJOR)
+#  error "no version macros -- lunasvg 2.x or older"
+#endif
+#if LUNASVG_VERSION_MAJOR < 3 || (LUNASVG_VERSION_MAJOR == 3 && LUNASVG_VERSION_MINOR < 5)
+#  error "lunasvg older than 3.5"
+#endif
+]], [[]])],
+    [AC_MSG_RESULT([yes])],
+    [AC_MSG_RESULT([no])
+     AC_MSG_ERROR([lunasvg 3.5 or newer is required.
+
+The headers found are older, or come from the 2.x series whose Document and
+Bitmap classes differ. Building would fail with C++ errors that do not name
+the real cause.
+
+    git clone --depth=1 --branch v3.5.0 https://github.com/sammycage/lunasvg
+])])
 CXXFLAGS="$ac_save_CXXFLAGS"
 
 
