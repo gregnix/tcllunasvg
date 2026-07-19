@@ -243,4 +243,17 @@ make clean
 
 ## License
 
-BSD 2-Clause (see `LICENSE`). lunasvg itself is MIT-licensed.
+BSD 2-Clause (see `LICENSE`).
+
+The rendering side brings its own licences: **lunasvg** and **plutovg** are MIT,
+and plutovg's rasteriser derives from FreeType, so parts of it are under the
+**FreeType License**. That one asks for credit in the documentation of a binary
+distribution:
+
+> Portions of this software are copyright The FreeType Project
+> (www.freetype.org). All rights reserved.
+
+All of them are permissive and none of it changes with static versus dynamic
+linking — only the reminder does. See
+[THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for the details, including
+the statically linked libstdc++ and the GCC Runtime Library Exception.
