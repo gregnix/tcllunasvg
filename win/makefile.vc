@@ -50,6 +50,21 @@ PROJECT = tcllunasvg
 # $(ROOT) is defined inside rules.vc, hence $(MAKEDIR) (the win/ directory).
 GENERICDIR = $(MAKEDIR)\..\src
 
+# C++ flags. The variable is COMPILERFLAGS, not PRJ_CFLAGS: rules.vc builds
+# its command line from
+#
+#     cflags = -nologo -c $(COMPILERFLAGS) ...
+#     appcflags_nostubs = $(cflags) ... $(PRJ_DEFINES) $(OPTDEFINES)
+#
+# so PRJ_DEFINES carries -D switches, but plain compiler flags have to go
+# through COMPILERFLAGS. A name rules.vc does not know is silently dropped --
+# the flags simply never appear, and lunasvg's headers then fail to compile
+# under the MSVC default of C++14.
+#
+# /std:c++17 is what lunasvg requires; /EHsc enables the standard exception
+# model, which the STL expects.
+COMPILERFLAGS = /std:c++17 /EHsc
+
 !include "rules-ext.vc"
 
 PRJ_OBJS = $(TMP_DIR)\tcllunasvg.obj
@@ -94,9 +109,6 @@ PRJ_DEFINES = \
 	-DLUNASVG_BUILD_STATIC \
 	-DUSE_TCL_STUBS
 
-# /std:c++17 for lunasvg, /EHsc because it uses exceptions.
-PRJ_CFLAGS = /std:c++17 /EHsc
-
 PRJ_LIBS = \
 	"$(LUNASVG_LIB_FILE)" \
 	"$(PLUTOVG_LIB_FILE)"
@@ -110,6 +122,34 @@ PRJ_LIBS = \
 # without it. The link then fails on __imp_ symbols although the makefile looks
 # correct. $(MAKEFILEVC) is set by rules.vc and names this file.
 $(PRJ_OBJS): $(MAKEFILEVC)
+
+# Stubs-only linken.
+#
+# rules.vc haengt fuer Tcl 9 zusaetzlich die Import-Bibliothek an
+# ($(TCLIMPLIB), etwa tcl90.lib). Eine Stubs-Erweiterung braucht sie nicht, und
+# eine mit MinGW gebaute Tcl-Distribution liefert gar keine -- der Link
+# scheitert dann an einer Datei, die es nirgends gibt:
+#
+#     LINK : fatal error LNK1181: ... "tcl90t.lib" kann nicht geoeffnet werden
+#
+# Das laesst sich NICHT von hier aus korrigieren: nmake loest Makros bereits
+# bei der Definition auf, und DLLCMD hat den Wert von tcllibs lange vorher
+# eingefroren. Die Korrektur steht deshalb in win/rules.vc (dort nach "PATCH:"
+# suchen): fehlt die Import-Bibliothek, werden nur die Stubs gelinkt.
+#     !else
+#     tcllibs = "$(TCLSTUBLIB)" "$(TCLIMPLIB)"
+#     !endif
+#
+# Eine Stubs-Erweiterung braucht die nicht -- der MinGW-Weg linkt ebenfalls nur
+# die Stub-Bibliothek. Schlimmer noch: eine mit MinGW gebaute Tcl-Distribution
+# (BAWT etwa) liefert gar keine MSVC-Import-Bibliothek, und der Link scheitert
+# an einer Datei, die es nirgends gibt:
+#
+#     LINK : fatal error LNK1181: ... "tcl90t.lib" kann nicht geoeffnet werden
+#
+# Die Zuweisung hier gewinnt, weil nmake Makros erst bei der Ausfuehrung
+# aufloest. Nebeneffekt: die DLL haengt nicht mehr hart an tcl90.dll.
+tcllibs = "$(TCLSTUBLIB)"
 
 # default-pkgindex-tea, not default-pkgindex.
 #

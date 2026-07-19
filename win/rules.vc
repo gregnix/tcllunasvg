@@ -1254,6 +1254,13 @@ TCL_INCLUDES	= -I"$(_TCLDIR)\generic" -I"$(_TCLDIR)\win"
 
 !if !$(STATIC_BUILD) && "$(TCL_BUILD_FOR)" == "8"
 tcllibs = "$(TCLSTUBLIB)"
+!elseif !exist("$(TCLIMPLIB)")
+# PATCH: for Tcl 9 stock TEA appends the import library, although a
+# stubs extension does not need it -- and a MinGW-built distribution
+# (BAWT, for one) ships none at all, so the link fails on a file that
+# does not exist anywhere. If it is missing, link the stubs only, which
+# is what the autoconf path does regardless.
+tcllibs = "$(TCLSTUBLIB)"
 !else
 tcllibs = "$(TCLSTUBLIB)" "$(TCLIMPLIB)"
 !endif
@@ -1328,7 +1335,12 @@ TKSCRIPTZIP     = $(_TKDIR)\win\$(BUILDDIRTOP)\$(TK_ZIP_FILE)
 
 !endif # TKINSTALL
 
+!if exist("$(TKIMPLIB)")
 tklibs = "$(TKSTUBLIB)" "$(TKIMPLIB)"
+!else
+# PATCH: see the comment at tcllibs
+tklibs = "$(TKSTUBLIB)"
+!endif
 
 !endif # $(DOING_TK)
 !endif # $(DOING_TK) || $(NEED_TK)
